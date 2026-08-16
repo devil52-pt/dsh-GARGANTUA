@@ -1,0 +1,7 @@
+# Normalise line endings to LF in the repo (Windows checkouts get CRLF automatically)
+* text=auto eol=lf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.gif binary

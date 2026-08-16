@@ -1,0 +1,13 @@
+# GARGANTUA — local dev / test artifacts
+.chrome-test/
+__pycache__/
+*.pyc
+*.log
+.pip-tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (not used, just in case)
+node_modules/

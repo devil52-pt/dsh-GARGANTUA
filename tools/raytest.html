@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>GARGANTUA raytracer shader test</title>
+<script type="importmap">{ "imports": { "three": "../vendor/three/three.module.js" } }</script>
+<style>body{background:#111;color:#eee;font-family:monospace;font-size:12px;padding:16px}pre{white-space:pre-wrap}</style>
+</head>
+<body>
+<canvas id="gl" width="256" height="256"></canvas>
+<pre id="out">running…</pre>
+<script type="module">
+import * as THREE from '../vendor/three/three.module.js';
+import { RAYVERT, RAYFRAG } from '../js/shaders.js';
+
+const canvas = document.getElementById('gl');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
+const gl = renderer.getContext();
+console.log('GL2:', gl instanceof WebGL2RenderingContext);
+
+const scene = new THREE.Scene();
+const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const mat = new THREE.RawShaderMaterial({
+  glslVersion: THREE.GLSL3,
+  vertexShader: RAYVERT,
+  fragmentShader: RAYFRAG,
+  depthTest: false, depthWrite: false,
+  uniforms: {
+    uResolution: { value: new THREE.Vector2(256, 256) },
+    uTime: { value: 0 },
+    uCamPos: { value: new THREE.Vector3(0, 0, 20) },
+    uCamBasis: { value: new THREE.Matrix3().set(1, 0, 0, 0, 1, 0, 0, 0, -1) }, // right, up, forward=-z (looking at origin)
+    uFov: { value: THREE.MathUtils.degToRad(60) },
+    uAspect: { value: 1 },
+    uMaxDist: { value: 500 },
+    uMaxSteps: { value: 320 },
+    uStepScale: { value: 0.02 },
+    uDiskInner: { value: 3.2 },
+    uDiskOuter: { value: 22 },
+    uDiskTemp: { value: 9000 },
+    uTempExp: { value: 0.75 },
+    uTurb: { value: 0.3 },
+    uTurbSpeed: { value: 0.5 },
+    uDoppler: { value: 1 },
+    uRedshift: { value: 1 },
+    uEmission: { value: 1.1 },
+    uDiskOpacity: { value: 0.94 },
+    uStarDensity: { value: 0.8 },
+    uGalaxy: { value: 1 },
+    uGalaxyTwist: { value: 1.2 },
+    uPass: { value: 0 },
+  },
+});
+scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat));
+
+// half-float colour RT
+const rt = new THREE.WebGLRenderTarget(256, 256, { type: THREE.HalfFloatType, format: THREE.RGBAFormat, depthBuffer: false });
+const rtAux = new THREE.WebGLRenderTarget(128, 128, { type: THREE.HalfFloatType, format: THREE.RGBAFormat, depthBuffer: false });
+
+renderer.setRenderTarget(rt);
+mat.uniforms.uResolution.value.set(rt.width, rt.height);
+mat.uniforms.uPass.value = 0;
+renderer.render(scene, cam);
+renderer.setRenderTarget(rtAux);
+mat.uniforms.uResolution.value.set(rtAux.width, rtAux.height);
+mat.uniforms.uPass.value = 1;
+renderer.render(scene, cam);
+renderer.setRenderTarget(null);
+
+function readPixels(target, x, y, w, h) {
+  const buf = new Float32Array(w * h * 4);
+  renderer.setRenderTarget(target);
+  gl.readPixels(x, y, w, h, gl.RGBA, gl.FLOAT, buf);
+  renderer.setRenderTarget(null);
+  return buf;
+}
+
+// face-on view: disk is an annulus 3.2..22 at distance 20.
+// uv.y = tan(theta)/tan(30); for rc=3.2: theta=atan(3.2/20)=9.1deg -> uv=0.277
+// probes at uv offsets: center(0), 0.25, 0.3, 0.4, 0.5, 0.75, 1.0, 1.5
+const probes = [
+  ['center', 0, 0],
+  ['uv0.20', 0, 0.20],
+  ['uv0.28', 0, 0.28],
+  ['uv0.40', 0, 0.40],
+  ['uv0.55', 0, 0.55],
+  ['uv0.75', 0, 0.75],
+  ['uv1.00', 0, 1.00],
+  ['uv1.50', 0, 1.50],
+];
+const out = [];
+out.push('=== COLOR RT (half float) probes ===');
+for (const [name, ux, uy] of probes) {
+  const px = Math.floor((ux * 0.5 + 0.5) * 256);
+  const py = Math.floor((uy * 0.5 + 0.5) * 256);
+  const b = readPixels(rt, px, py, 1, 1);
+  out.push(`${name} px(${px},${py}): rgba=${b[0].toFixed(4)}, ${b[1].toFixed(4)}, ${b[2].toFixed(4)}, ${b[3].toFixed(4)}`);
+}
+out.push('=== AUX RT probes (steps, crossings, doppler, rHit) ===');
+for (const [name, ux, uy] of probes) {
+  const px = Math.floor((ux * 0.5 + 0.5) * 128);
+  const py = Math.floor((uy * 0.5 + 0.5) * 128);
+  const b = readPixels(rtAux, px, py, 1, 1);
+  out.push(`${name}: steps=${(b[0] * 320).toFixed(0)} crossings=${(b[1] * 8).toFixed(1)} doppler=${(b[2] * 8).toFixed(3)} rHit=${(b[3] * 500).toFixed(2)}`);
+}
+document.getElementById('out').textContent = out.join('\n');
+console.log(out.join('\n'));
+</script>
+</body>
+</html>
