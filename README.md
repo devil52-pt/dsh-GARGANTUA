@@ -14,6 +14,14 @@ for every pixel.
 > lensing of the disk and starfield, multiple disk-plane crossings, relativistic
 > Doppler beaming, and gravitational redshift.
 
+## 在线体验 (Online demo)
+
+**https://devil52-pt.github.io/dsh-GARGANTUA/**
+
+> 启用方式：仓库 Settings → **Pages** → Source 选 `Deploy from a branch` →
+> `main` → 根目录 `/` → Save，等待 1–2 分钟即可访问。纯静态页面，无需服务器
+> （`server.js` 只提供截图自动化接口，网页本身可独立运行）。
+
 ## Screenshots
 
 Real captures from the raytracer (see `screenshots/`):
